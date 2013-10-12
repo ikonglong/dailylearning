@@ -1,5 +1,8 @@
-# Ignore eclipse project config files
+# Ignore eclipse project config files and output of building project
 /**/.settings/
 /**/.classpath
 /**/.project
+# The trailing forward slash(/) is not necessary for directory
+# The leading forward slash represents root directory
 /**/target
+**/bin/
