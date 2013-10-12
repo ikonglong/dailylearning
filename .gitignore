@@ -5,4 +5,5 @@
 # The trailing forward slash(/) is not necessary for directory
 # The leading forward slash represents root directory
 /**/target
+# The forward slash before double asterisks is not necessary
 **/bin/
