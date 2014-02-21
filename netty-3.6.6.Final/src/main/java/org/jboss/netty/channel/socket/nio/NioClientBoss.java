@@ -144,6 +144,15 @@ public final class NioClientBoss extends AbstractNioSelector implements Boss {
         }
     }
 
+    /**
+     * 并非实际建立socket连接的方法。
+     * 完成SelectionKey对应的channel的connect操作，同时检查连接状态。
+     * 当前对象持有的selector中注册的都是在NioClientSocketPipelineSink.connect(...)中
+     * 未能立即成功建立连接的channel。如果已连接成功，就将其从selector中移除，并交给NioWorker去处理。
+     *
+     * @param k
+     * @throws IOException
+     */
     private static void connect(SelectionKey k) throws IOException {
         NioClientSocketChannel ch = (NioClientSocketChannel) k.attachment();
         try {
@@ -152,6 +161,7 @@ public final class NioClientBoss extends AbstractNioSelector implements Boss {
                 if (ch.timoutTimer != null) {
                     ch.timoutTimer.cancel();
                 }
+                // 由NioWorker将channel注册至其持有的selector中，并监听用户感兴趣的操作
                 ch.worker.register(ch, ch.connectFuture);
             }
         } catch (ConnectException e) {
@@ -177,6 +187,10 @@ public final class NioClientBoss extends AbstractNioSelector implements Boss {
         }
 
         public void run() {
+            /*
+             * 如果在NioClientSocketPipelineSink.connect(...)中与服务端连接建立失败，
+             * 就会在NioClientBoss.run()所在的IoThread中执行该任务
+             */
             int timeout = channel.getConfig().getConnectTimeoutMillis();
             if (timeout > 0) {
                 if (!channel.isConnected()) {

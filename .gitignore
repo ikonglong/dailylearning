@@ -1,9 +1,31 @@
-# Ignore eclipse project config files and output of building project
-/**/.settings/
-/**/.classpath
-/**/.project
-# The trailing forward slash(/) is not necessary for directory
-# The leading forward slash represents root directory
-/**/target
-# The forward slash before double asterisks is not necessary
-**/bin/
+# built application files
+*.apk
+*.ap_
+*.log
+config.client.*
+diamond_config_data.*
+
+*.jpg
+
+# Java class files
+*.class
+
+# generated files
+bin/
+gen/
+logs/
+log/
+target/
+hsf.configuration/
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# Eclipse project files
+.project
+.settings
+.classpath
+
+# IDEA project files
+.idea
+*.iml

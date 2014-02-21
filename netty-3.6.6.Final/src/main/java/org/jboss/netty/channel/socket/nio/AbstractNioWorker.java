@@ -105,12 +105,15 @@ abstract class AbstractNioWorker extends AbstractNioSelector implements Worker {
             i.remove();
             try {
                 int readyOps = k.readyOps();
+                // 什么情况下readyOps()返回0
                 if ((readyOps & SelectionKey.OP_READ) != 0 || readyOps == 0) {
+                    // 如果读取失败，则表明socket连接已关闭，无需处理写操作
                     if (!read(k)) {
                         // Connection already closed - no need to handle write.
                         continue;
                     }
                 }
+                // 处理写操作
                 if ((readyOps & SelectionKey.OP_WRITE) != 0) {
                     writeFromSelectorLoop(k);
                 }
@@ -171,7 +174,14 @@ abstract class AbstractNioWorker extends AbstractNioSelector implements Worker {
 
         final SocketSendBufferPool sendBufferPool = this.sendBufferPool;
         final WritableByteChannel ch = channel.channel;
-        final Queue<MessageEvent> writeBuffer = channel.writeBufferQueue;
+        final Queue<MessageEvent> writeEvtQue = channel.writeBufferQueue;
+        /*
+         * The maximum loop count for a write operation until
+         * WritableByteChannel.write(ByteBuffer) returns a non-zero value.
+         * It is similar to what a spin lock(旋转锁) is used for in concurrency programming.
+         * It improves memory utilization and write throughput depending on
+         * the platform that JVM runs on.  The default value is {@code 16}.
+         */
         final int writeSpinCount = channel.getConfig().getWriteSpinCount();
         List<Throwable> causes = null;
 
@@ -184,7 +194,7 @@ abstract class AbstractNioWorker extends AbstractNioSelector implements Worker {
                 ChannelFuture future = null;
                 try {
                     if (evt == null) {
-                        if ((channel.currentWriteEvent = evt = writeBuffer.poll()) == null) {
+                        if ((channel.currentWriteEvent = evt = writeEvtQue.poll()) == null) {
                             removeOpWrite = true;
                             channel.writeSuspended = false;
                             break;
@@ -215,7 +225,7 @@ abstract class AbstractNioWorker extends AbstractNioSelector implements Worker {
                         channel.currentWriteEvent = null;
                         channel.currentWriteBuffer = null;
                         // Mark the event object for garbage collection.
-                        //noinspection UnusedAssignment
+                        // noinspection UnusedAssignment
                         evt = null;
                         buf = null;
                         future.setSuccess();
@@ -241,9 +251,9 @@ abstract class AbstractNioWorker extends AbstractNioSelector implements Worker {
                     channel.currentWriteEvent = null;
                     channel.currentWriteBuffer = null;
                     // Mark the event object for garbage collection.
-                    //noinspection UnusedAssignment
+                    // noinspection UnusedAssignment
                     buf = null;
-                    //noinspection UnusedAssignment
+                    // noinspection UnusedAssignment
                     evt = null;
                     if (future != null) {
                         future.setFailure(t);
@@ -269,7 +279,7 @@ abstract class AbstractNioWorker extends AbstractNioSelector implements Worker {
                         open = false;
                     }
                 }
-            }
+            } // end for loop
             channel.inWriteNowLoop = false;
 
             // Initially, the following block was executed after releasing
@@ -285,7 +295,7 @@ abstract class AbstractNioWorker extends AbstractNioSelector implements Worker {
                     clearOpWrite(channel);
                 }
             }
-        }
+        } // end synchronized block
         if (causes != null) {
             for (Throwable cause: causes) {
                 // notify about cause now as it was triggered in the write loop

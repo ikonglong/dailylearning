@@ -205,10 +205,13 @@ public class NioClientSocketChannelFactory implements ClientSocketChannelFactory
         }
         this.bossPool = bossPool;
         this.workerPool = workerPool;
+        // 注意哦，bossPool被传递给了NioClientSocketPipelineSink对象
         sink = new NioClientSocketPipelineSink(bossPool);
     }
 
     public SocketChannel newChannel(ChannelPipeline pipeline) {
+        // 新创建的channel并没有关联NioClientBoss，那bossPool在哪里有使用？
+        // 请注意上面的构造函数中将bossPool传递给了NioClientSocketPipelineSink构造器
         return new NioClientSocketChannel(this, pipeline, sink, workerPool.nextWorker());
     }
 
