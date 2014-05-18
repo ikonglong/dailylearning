@@ -9,8 +9,11 @@ import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.packet.Message;
 
 import javax.swing.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 
-public class Main {
+public class Main implements AuctionEventListener {
+
     private static final int ARG_HOSTNAME = 0;
     private static final int ARG_USERNAME = 1;
     private static final int ARG_PASSWORD = 2;
@@ -19,6 +22,9 @@ public class Main {
     public static final String AUCTION_RESOURCE = "Auction";
     public static final String ITEM_ID_AS_LOGIN = "auction-%s";
     public static final String AUCTION_ID_FORMAT = ITEM_ID_AS_LOGIN + "@%s/" + AUCTION_RESOURCE;
+
+    public static final String JOIN_COMMAND_FORMAT = "SOLVersion: 1.1; Command: JOIN;";
+    public static final String BID_COMMAND_FORMAT = "SOLVersion: 1.1; Command: BID; Price: %d;";
 
     @SuppressWarnings("unused")
     private Chat notToBeGCd;
@@ -67,20 +73,34 @@ public class Main {
     private void joinAction(XMPPConnection connection, String itemId) throws XMPPException {
         final Chat chat = connection.getChatManager().createChat(
                 auctionId(itemId, connection),
-                new MessageListener() {
-                    @Override
-                    public void processMessage(Chat chat, Message message) {
-                        SwingUtilities.invokeLater(new Runnable() {
-                            @Override
-                            public void run() {
-                                ui.showStatus(MainWindow.STATUS_LOST);
-                            }
-                        });
-                    }
-                }
+                new AuctionMessageTranslator(this)
         );
         this.notToBeGCd = chat;
+        chat.sendMessage(JOIN_COMMAND_FORMAT);
+    }
 
-        chat.sendMessage(new Message());
+    private void disconnectWhenUICloses(final XMPPConnection connection) {
+        ui.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosed(WindowEvent e) {
+                connection.disconnect();
+            }
+        });
+    }
+
+    @Override
+    public void auctionClosed() {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                // 简单地认为Auction只会发送close message for chapter 11
+                ui.showStatus(MainWindow.STATUS_LOST);
+            }
+        });
+    }
+
+    @Override
+    public void currentPrice(int i, int i1) {
+        // TODO Fill in here
     }
 }
