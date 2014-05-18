@@ -1,4 +1,5 @@
 # Ignore eclipse project config files and output of building project
+# ====================================================================
 /**/.settings/
 /**/.classpath
 /**/.project
@@ -7,3 +8,10 @@
 /**/target
 # The forward slash before double asterisks is not necessary
 **/bin/
+
+# Ignore IntelliJ project config files and output of building project
+# ====================================================================
+**/.idea/
+**/bin/
+/**/*.iml
+/**/out
