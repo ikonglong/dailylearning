@@ -128,16 +128,19 @@ public final class NioServerBoss extends AbstractNioSelector implements Boss {
     }
 
     private static void registerAcceptedChannel(NioServerSocketChannel parent, SocketChannel acceptedSocket,
-                                         Thread currentThread) {
+                                         Thread bossThread) {
         try {
             ChannelSink sink = parent.getPipeline().getSink();
             ChannelPipeline pipeline =
                     parent.getConfig().getPipelineFactory().getPipeline();
             NioWorker worker = parent.workerPool.nextWorker();
+            // 与parent channel共享同一个NioServerSocketPipelineSink对象
+            // accepted channel并不是从parent channel的NioServerSocketChannelFactory中创建出来的，
+            // 它为什么要保存parent channel的factory对象呢？
             worker.register(new NioAcceptedSocketChannel(
                     parent.getFactory(), pipeline, parent, sink
                     , acceptedSocket,
-                    worker, currentThread), null);
+                    worker, bossThread), null);
         } catch (Exception e) {
             if (logger.isWarnEnabled()) {
                 logger.warn(

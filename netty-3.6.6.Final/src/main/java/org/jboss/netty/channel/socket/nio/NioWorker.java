@@ -147,6 +147,8 @@ public class NioWorker extends AbstractNioWorker {
             }
 
             try {
+                // 当前类由client和server共用，如果channel是server端的，
+                // 就将通道设置为非阻塞的
                 if (server) {
                     channel.channel.configureBlocking(false);
                 }
@@ -159,9 +161,12 @@ public class NioWorker extends AbstractNioWorker {
                     future.setSuccess();
                 }
 
+                // 如果是服务端channel或者非手工绑定本地端口的客户端channel
                 if (server || !((NioClientSocketChannel) channel).boundManually) {
                     fireChannelBound(channel, localAddress);
                 }
+
+                // 对client channel来说，在NioClientSocketPipelineSink.connect(...)已经建立与服务端的连接了
                 fireChannelConnected(channel, remoteAddress);
             } catch (IOException e) {
                 if (future != null) {

@@ -115,7 +115,7 @@ abstract class AbstractNioSelector implements NioSelector {
         	
         	/*
         	 * Added by Simon
-        	 * 在这里当wakenUp为false时，如果因为调用selector.select(...)方法而阻塞的IO thread没有被其他线程唤醒的话，
+        	 * 在这里当wakenUp为false时，如果有IO thread因为调用selector.select(...)方法而阻塞且未被其他线程唤醒的话，
         	 * 刚接受(accepted)的socket channel在selector那儿的注册工作就没办法进行了，导致无法进行后续的读写操作。
         	 * 请看NioServerBoss类bind(...)和registerAcceptedChannel(...)方法
         	 */
@@ -227,19 +227,24 @@ abstract class AbstractNioSelector implements NioSelector {
                  * selector.select(...):
                  * This method performs a blocking selection operation.
                  * It returns only after at least one channel is selected, this selector's wakeup method is invoked,
-                 * the current thread is interrupted, or the given timeout period expires, whichever comes first. 
+                 * the current thread is interrupted, or the given timeout period expires, whichever comes first.
+                 * @return  The number of keys, possibly zero, whose ready-operation sets were updated
                  */
                 int selected = select(selector);
                 
                 // Added by Simon
                 // selected为0有三种可能：selector.wakeup()方法被调用了、当前线程被中断了、给定的暂停时间到期了
+                // 上面这句注释有问题，从api doc上看，没有明确说明合适返回0，上面的信息来自哪里？
+                // 首先，selected为0表明select操作没有选取到任何可操作的channel，那么下面这个if分支就是在处理非正常情况
                 if (SelectorUtil.EPOLL_BUG_WORKAROUND && selected == 0 && !wakenupFromLoop && !wakenUp.get()) {
                     long timeBlocked = System.nanoTime() - beforeSelect;
 
                     if (timeBlocked < minSelectTimeout) {
+                        // 标示selector中是否有已关闭的通道
                         boolean notConnected = false;
                         // loop over all keys as the selector may was unblocked because of a closed channel
-                        // 遍历所有的key，selector可能是畅通的，只是因为一个已经关闭了的channel导致selector.select(...)调用阻塞
+                        // 遍历所有的key，因为selector可能因为一个已经关闭了的channel而解除了阻塞。
+                        // 因此，我们需要遍历所有的key，处理那些已关闭的通道
                         for (SelectionKey key: selector.keys()) {
                             SelectableChannel ch = key.channel();
                             try {
@@ -265,6 +270,10 @@ abstract class AbstractNioSelector implements NioSelector {
                         selectReturnsImmediately = 0;
                     }
 
+                    /*
+                     * 如果在 minSelectTimeout 到期前尝试了1024次select操作仍然没有选取到任何东西，
+                     * 那我们可能碰到了jdk epoll bug，此时需要重建selector对象等等
+                     */
                     if (selectReturnsImmediately == 1024) {
                         // The selector returned immediately for 10 times in a row,
                         // so recreate one selector as it seems like we hit the
@@ -318,6 +327,7 @@ abstract class AbstractNioSelector implements NioSelector {
 
                 cancelledKeys = 0;
                 processTaskQueue();
+                // processTaskQueue()可能会rebuild selector，所以此时需要重新赋值
                 selector = this.selector; // processTaskQueue() can call rebuildSelector()
 
                 if (shutdown) {

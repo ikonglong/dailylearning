@@ -105,7 +105,10 @@ class NioClientSocketPipelineSink extends AbstractNioChannelSink {
             SocketAddress remoteAddress) {
         channel.requestedRemoteAddress = remoteAddress;
         try {
+            // 尝试与远程对等端建立socket连接，注意是同步执行哦
             if (channel.channel.connect(remoteAddress)) {
+                // 如果成功建立连接，就由NioWorker将该channel注册至它持有的selector中，
+                // 并默认监听此channel read操作的状态
                 channel.worker.register(channel, cf);
             } else {
                 channel.getCloseFuture().addListener(new ChannelFutureListener() {
@@ -118,6 +121,8 @@ class NioClientSocketPipelineSink extends AbstractNioChannelSink {
                 });
                 cf.addListener(ChannelFutureListener.CLOSE_ON_FAILURE);
                 channel.connectFuture = cf;
+                // 如果连接失败，则由NioClientBoss将该channel注册至它持有的selector中，
+                // 并监听此channel connect操作的状态
                 nextBoss().register(channel, cf);
             }
 

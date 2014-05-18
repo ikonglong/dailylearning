@@ -90,9 +90,6 @@ public abstract class HeapChannelBuffer extends AbstractChannelBuffer {
         return array[index];
     }
     
-    // getBytes(...)系列方法将当前ChannelBuffer对象中指定位置的数据
-    // 转存(实际就是拷贝)至给定目标对象的指定位置
-    
     public void getBytes(int index, ChannelBuffer dst, int dstIndex, int length) {
         if (dst instanceof HeapChannelBuffer) {
             getBytes(index, ((HeapChannelBuffer) dst).array, dstIndex, length);
@@ -122,9 +119,6 @@ public abstract class HeapChannelBuffer extends AbstractChannelBuffer {
     public void setByte(int index, int value) {
         array[index] = (byte) value;
     }
-    
-    // setBytes(...)系列方法将给定的源对象中指定位置的数据
-    // 转存(实际就是拷贝)至当前ChannelBuffer对象的指定位置
     
     public void setBytes(int index, ChannelBuffer src, int srcIndex, int length) {
         if (src instanceof HeapChannelBuffer) {

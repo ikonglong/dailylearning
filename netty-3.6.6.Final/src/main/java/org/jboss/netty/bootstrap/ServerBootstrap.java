@@ -320,6 +320,8 @@ public class ServerBootstrap extends Bootstrap {
         Binder binder = new Binder(localAddress);
         ChannelHandler parentHandler = getParentHandler();
 
+        // 对比下面这条语句和ServerBootstrap.Binder.channelOpen(...)方法中
+        // 创建ChannelPipeline对象的方式，想想为什么不同？
         ChannelPipeline bossPipeline = pipeline();
         bossPipeline.addLast("binder", binder);
         if (parentHandler != null) {
@@ -361,7 +363,7 @@ public class ServerBootstrap extends Bootstrap {
             	// 将用户在创建ServerBootstrap实例时给定的pipelineFactory设置给evt.getChannel()的channelConfig，
             	// 用于稍后服务端accept新的连接请求时为每一个channel创建并关联一个ChannelPipeline对象。具体请参考：
             	// NioServerBoss.registerAcceptedChannel(...)方法。
-            	// 而ServerBootstrap在创建evt.getChannel()并为其指定一个ChannelPipeline时，并未使用
+            	// 而ServerBootstrap在创建ServerSocketChannel并为其指定一个ChannelPipeline时，并未使用
             	// ServerBootstrap.getPipelineFactory()，而是直接调用了Channels.pipeline()方法，因为创建ServerSocketChannel
             	// 时不需要也不应该为其指定一个包含了用户自定义handler的ChannelPipeline对象。具体请参考：
             	// ServerBootstrap.bindAsync(localAddress)方法

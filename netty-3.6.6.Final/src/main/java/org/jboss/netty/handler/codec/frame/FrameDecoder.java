@@ -185,6 +185,14 @@ public abstract class FrameDecoder extends SimpleChannelUpstreamHandler implemen
     protected ChannelBuffer cumulation;
     private volatile ChannelHandlerContext ctx;
     private int copyThreshold;
+    /**
+     *  The maximum number of components in the cumulation buffer. 
+     *  If the number of the components in the cumulation buffer exceeds this value, 
+     *  the components of the cumulation buffer are consolidated into a single component, 
+     *  involving memory copies. The default value of this property 
+     *  is DEFAULT_MAX_COMPOSITEBUFFER_COMPONENTS and its minimum allowed value is 2.<br/>
+     *  Added by chenlong
+     */
     private int maxCumulationBufferComponents = DEFAULT_MAX_COMPOSITEBUFFER_COMPONENTS;
 
     protected FrameDecoder() {
@@ -316,15 +324,18 @@ public abstract class FrameDecoder extends SimpleChannelUpstreamHandler implemen
 
     protected ChannelBuffer appendToCumulation(ChannelBuffer input) {
         ChannelBuffer cumulation = this.cumulation;
-        assert cumulation.readable();
+        assert cumulation.readable(); // ???
         if (cumulation instanceof CompositeChannelBuffer) {
             // Make sure the resulting cumulation buffer has no more than the configured components.
             CompositeChannelBuffer composite = (CompositeChannelBuffer) cumulation;
+            // 有关 maxCumulationBufferComponents 字段的解释请参考本类的setMaxCumulationBufferComponents(...)方法
             if (composite.numComponents() >= maxCumulationBufferComponents) {
                 cumulation = composite.copy();
             }
         }
 
+        // wrappedBuffer(...): Creates a new composite buffer which wraps the readable bytes of
+        // the specified buffers without copying them.
         this.cumulation = input = ChannelBuffers.wrappedBuffer(cumulation, input);
         return input;
     }
@@ -334,19 +345,40 @@ public abstract class FrameDecoder extends SimpleChannelUpstreamHandler implemen
         int readableBytes = input.readableBytes();
         if (readableBytes > 0) {
             int inputCapacity = input.capacity();
+            
+            /*
+             * 若copyThreshold == Integer.MAX_VALUE，将禁止字节拷贝，代价就是更高的内存使用
+             * 若copyThreshold == 0，将总是拷贝字节以减少内存使用
+             * 详细描述请看本类 setMaxCumulationBufferCapacity() 方法的注释
+             */
 
             // If input.readableBytes() == input.capacity() (i.e. input is full),
             // there's nothing to save from creating a new cumulation buffer
             // even if input.capacity() exceeds the threshold, because the new cumulation
             // buffer will have the same capacity and content with input.
+            // save from 使...免去/免受/省去
+            // 如果 input.readableBytes等于input.capacity(即buffer满了)，那么此时创建一个新的cumulation buffer没有省去什么，
+            // 即使inputBuffer的容量超过了拷贝阈值，因为新的cumulation buffer与inputBuffer拥有相同的容量和内容
             if (readableBytes < inputCapacity && inputCapacity > copyThreshold) {
+            	
                 // At least one byte was consumed by callDecode() and input.capacity()
                 // exceeded the threshold.
+            	
+            	// readableBytes < inputCapacity 就表明调用callDecode()至少消费了一个字节？不懂
+            	// 推敲：readableBytes=writerIndex-readerIndex < capacity，只有当writerIndex为capacity时，
+            	// 才敢断言如果readableBytes < inputCapacity，那么callDecode()至少消费了一个字节。
+            	// input的writerIndex真的等于capacity吗？待求证
+            	// input的第一个来源：NioWorker.read(SelectionKey)，其中input.writerIndex确实等于capacity
+            	// input的第二个来源：FrameDecoder.messageReceived()中input=appendToCumulation(input)，待确定
+            	
+            	// 新的cumulation buffer与inputBuffer拥有相同内容，但容量可能相同也可能不同(与256比较取最大值)
                 cumulation = newCumulation = newCumulationBuffer(ctx, input.readableBytes());
                 cumulation.writeBytes(input);
             } else {
                 // Nothing was consumed by callDecode() or input.capacity() did not
                 // exceed the threshold.
+            	// readableBytes == inputCapacity 就表明调用callDecode()没有消费任何东西？
+            	// 证明：readableBytes=writerIndex-readerIndex=inputCapacity => readerIndex为 0，writerIndex为capacity
                 if (input.readerIndex() != 0) {
                     cumulation = newCumulation = input.slice();
                 } else {
@@ -422,6 +454,9 @@ public abstract class FrameDecoder extends SimpleChannelUpstreamHandler implemen
 
         while (cumulation.readable()) {
             int oldReaderIndex = cumulation.readerIndex();
+            // 这里不能对 decode(...)方法对传入的channelBuffer进行的操作 做任何假设
+            // 1. channelBuffer.readerIndex可能原地不动，也可能已改变或者改变后又被重置为原本的值
+            // 2. 
             Object frame = decode(context, channel, cumulation);
             if (frame == null) {
                 if (oldReaderIndex == cumulation.readerIndex()) {
@@ -432,8 +467,9 @@ public abstract class FrameDecoder extends SimpleChannelUpstreamHandler implemen
                 } else {
                     // Previous data has been discarded.
                     // Probably it is reading on.
+                	
                 	// 表示还没有读取到frame包含的所有数据，需要等待其他数据包的到来
-                	// 前面的decode(...)调用导致readerIndex向后(不断增大)移动，那么之前路过的数据就被丢弃了
+                	// 前面的decode(...)调用导致readerIndex向后(不断增大)移动，那么之前路过的数据就被丢弃了？
                 	// 思考哈这里为什么不直接break而是continue呢？
                     continue;
                 }

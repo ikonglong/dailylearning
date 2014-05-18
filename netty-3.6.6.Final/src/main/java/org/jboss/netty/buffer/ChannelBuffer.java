@@ -601,7 +601,9 @@ public interface ChannelBuffer extends Comparable<ChannelBuffer> {
      * number of the transferred bytes while
      * {@link #getBytes(int, ChannelBuffer, int, int)} does not.
      * This method does not modify {@code readerIndex} or {@code writerIndex} of
-     * the source buffer (i.e. {@code this}).
+     * the source buffer (i.e. {@code this}).<br/>
+     * getBytes(...)系列方法将当前ChannelBuffer对象中指定位置的数据
+     * 转存(实际就是拷贝)至给定目标对象的指定位置
      *
      * @param length the number of bytes to transfer
      *
@@ -855,7 +857,9 @@ public interface ChannelBuffer extends Comparable<ChannelBuffer> {
      * Transfers the specified source buffer's data to this buffer starting at
      * the specified absolute {@code index}.
      * This method does not modify {@code readerIndex} or {@code writerIndex}
-     * of both the source (i.e. {@code this}) and the destination.
+     * of both the source (i.e. {@code this}) and the destination.<br/>
+     * setBytes(...)系列方法将给定的源对象中指定位置的数据转存(实际就是拷贝)
+     * 至当前ChannelBuffer对象的指定位置
      *
      * @param srcIndex the first index of the source
      * @param length   the number of bytes to transfer
@@ -1328,7 +1332,8 @@ public interface ChannelBuffer extends Comparable<ChannelBuffer> {
      * {@link #writeBytes(ChannelBuffer, int, int)}, except that this method
      * increases the {@code readerIndex} of the source buffer by the number of
      * the transferred bytes while {@link #writeBytes(ChannelBuffer, int, int)}
-     * does not.
+     * does not.<br/>
+     * 将给定的源buffer中的数据转存(实际就是拷贝)至当前buffer
      *
      * @throws IndexOutOfBoundsException
      *         if {@code src.readableBytes} is greater than
